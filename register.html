@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Phishing Detector Dashboard</title>
+    <style>
+        body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #111827; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .box { background: white; padding: 40px; border-radius: 14px; width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .box h1 { font-size: 20px; margin-top: 0; text-align: center; }
+        input { width: 100%; padding: 10px; margin-bottom: 14px; border: 1px solid #e5e7eb; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; border: none; border-radius: 8px; background: #16a34a; color: white; font-weight: bold; cursor: pointer; }
+        .error { color: #dc2626; font-size: 13px; margin-bottom: 10px; text-align: center; }
+        .link { text-align:center; margin-top:14px; font-size:13px; }
+        .hint { color:#6b7280; font-size:12px; margin: -8px 0 14px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>Create your account</h1>
+        <p class="hint">This is your dashboard login. You'll connect your actual email inbox (Gmail app password etc.) after logging in.</p>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form method="post">
+            <input type="text" name="username" placeholder="Choose a username" required>
+            <input type="password" name="password" placeholder="Choose a password" required>
+            <button type="submit">Create account</button>
+        </form>
+        <div class="link">Already have an account? <a href="{{ url_for('login') }}">Log in</a></div>
+    </div>
+</body>
+</html>

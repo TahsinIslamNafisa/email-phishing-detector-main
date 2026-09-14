@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phishing Email Security Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f3f4f6; color: #111827; }
+        .header { background: linear-gradient(135deg, #111827, #1f2937); color: white; padding: 28px 5%; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+        .header h1 { margin: 0; font-size: 28px; }
+        .header p { margin: 8px 0 0; color: #d1d5db; }
+        .header a { color: #93c5fd; }
+        .container { width: 90%; max-width: 1400px; margin: 30px auto; }
+        .flash { background:#fef9c3; color:#854d0e; padding:12px 16px; border-radius:10px; margin-bottom:20px; }
+        .status { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); flex-wrap: wrap; gap:10px; }
+        .online { color: #16a34a; font-weight: bold; }
+        .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px; }
+        .card { background: white; border-radius: 14px; padding: 25px; box-shadow: 0 3px 12px rgba(0,0,0,0.07); }
+        .card-title { color: #6b7280; font-size: 14px; }
+        .card-number { font-size: 35px; font-weight: bold; margin-top: 10px; }
+        .blue { color: #2563eb; } .green { color: #16a34a; } .red { color: #dc2626; } .orange { color: #ea580c; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }
+        .panel { background: white; padding: 25px; border-radius: 14px; box-shadow: 0 3px 12px rgba(0,0,0,0.07); }
+        .panel h2 { margin-top: 0; font-size: 20px; }
+        .chart-box { height: 300px; }
+        .table-panel { background: white; padding: 25px; border-radius: 14px; box-shadow: 0 3px 12px rgba(0,0,0,0.07); margin-bottom: 25px; }
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f9fafb; text-align: left; padding: 14px; font-size: 13px; }
+        td { padding: 14px; border-top: 1px solid #e5e7eb; font-size: 14px; }
+        .safe { color: #16a34a; font-weight: bold; }
+        .phishing { color: #dc2626; font-weight: bold; }
+        .badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; }
+        .badge-safe { background: #dcfce7; color: #166534; }
+        .badge-phishing { background: #fee2e2; color: #991b1b; }
+        .badge-active { background:#dbeafe; color:#1e40af; padding:4px 10px; border-radius:20px; font-size:12px; }
+        .refresh { font-size: 13px; color: #6b7280; }
+        .btn { padding:8px 16px; border-radius:8px; border:none; cursor:pointer; font-size:14px; }
+        .btn-blue { background:#2563eb; color:white; }
+        .btn-dark { background:#111827; color:white; text-decoration:none; }
+        .btn-green { background:#16a34a; color:white; }
+        .btn-red { background:#dc2626; color:white; }
+        .link-btn { border:none; background:none; color:#dc2626; cursor:pointer; }
+        input[type=text], input[type=password], input[type=email] { padding:8px; border:1px solid #e5e7eb; border-radius:8px; }
+        @media (max-width: 900px) { .cards { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } }
+        @media (max-width: 550px) { .cards { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1>🛡️ Phishing Email Security Dashboard</h1>
+        <p>Real-Time Email Threat Monitoring - logged in as <strong>{{ username }}</strong></p>
+    </div>
+    <div><a href="{{ url_for('logout') }}">Logout</a></div>
+</div>
+
+<div class="container">
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for m in messages %}
+          <div class="flash">{{ m }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="status">
+        <div>System Status: <span class="online">● ONLINE</span></div>
+        <div class="refresh">Background scanner runs every {{ check_interval }}s</div>
+        <button onclick="location.reload()" class="btn btn-blue">🔄 Refresh</button>
+    </div>
+
+    <div class="status">
+        <form method="get" action="{{ url_for('dashboard') }}" style="display:flex; gap:10px; flex:1;">
+            <input type="text" name="q" placeholder="Search sender / subject / result..." value="{{ search }}" style="flex:1;">
+            <button type="submit" class="btn btn-blue">Search</button>
+            {% if search %}
+                <a href="{{ url_for('dashboard') }}" class="btn" style="background:#e5e7eb; color:#111827; text-decoration:none; display:flex; align-items:center;">✕ Clear</a>
+            {% endif %}
+        </form>
+        <a href="{{ url_for('export_csv') }}" class="btn btn-dark">⬇ Export CSV</a>
+    </div>
+
+    <!-- Statistics -->
+    <div class="cards">
+        <div class="card"><div class="card-title">Total Emails Scanned</div><div class="card-number blue">{{ stats.total_scanned }}</div></div>
+        <div class="card"><div class="card-title">Safe Emails</div><div class="card-number green">{{ stats.safe_emails }}</div></div>
+        <div class="card"><div class="card-title">Phishing Emails</div><div class="card-number red">{{ stats.phishing_emails }}</div></div>
+        <div class="card"><div class="card-title">Detection Rate</div><div class="card-number orange">{{ stats.detection_rate }}%</div></div>
+    </div>
+
+    <!-- Connected email accounts -->
+    <div class="table-panel">
+        <h2>📥 My Connected Email Accounts</h2>
+        <p style="color:#6b7280; font-size:14px;">
+            Each account you connect here is scanned automatically in the background every
+            {{ check_interval }} seconds, and only you can see its results.
+        </p>
+
+        <form method="post" action="{{ url_for('accounts_add') }}" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;">
+            <input type="text" name="label" placeholder="Label (e.g. Work Gmail)" style="flex:1; min-width:140px;">
+            <input type="email" name="email_address" placeholder="you@gmail.com" required style="flex:1; min-width:180px;">
+            <input type="password" name="app_password" placeholder="App password" required style="flex:1; min-width:140px;">
+            <input type="text" name="imap_server" placeholder="IMAP server" value="{{ default_imap_server }}" style="flex:1; min-width:140px;">
+            <input type="email" name="alert_email" placeholder="Send alerts to (optional)" style="flex:1; min-width:180px;">
+            <button type="submit" class="btn btn-green">+ Connect account</button>
+        </form>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Label</th>
+                        <th>Email</th>
+                        <th>IMAP Server</th>
+                        <th>Status</th>
+                        <th>Last Scanned</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for acc in accounts %}
+                    <tr>
+                        <td>{{ acc[1] }}</td>
+                        <td>{{ acc[2] }}</td>
+                        <td>{{ acc[3] }}</td>
+                        <td>{% if acc[5] %}<span class="badge-active">Active</span>{% else %}Inactive{% endif %}</td>
+                        <td>{{ acc[6] or "Not scanned yet" }}</td>
+                        <td style="display:flex; gap:10px;">
+                            <form method="post" action="{{ url_for('accounts_scan_now') }}">
+                                <input type="hidden" name="account_id" value="{{ acc[0] }}">
+                                <button type="submit" class="btn btn-blue">Scan now</button>
+                            </form>
+                            <form method="post" action="{{ url_for('accounts_remove') }}">
+                                <input type="hidden" name="account_id" value="{{ acc[0] }}">
+                                <button type="submit" class="link-btn">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" style="text-align:center">No connected accounts yet. Add one above.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid">
+        <div class="panel">
+            <h2>Email Classification</h2>
+            <div class="chart-box"><canvas id="emailChart"></canvas></div>
+        </div>
+        <div class="panel">
+            <h2>14-Day Trend</h2>
+            <div class="chart-box"><canvas id="trendChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Recent scans -->
+    <div class="table-panel">
+        <h2>📧 Recent Email Scans</h2>
+        {% if search %}
+            <p style="color:#6b7280; font-size:14px; margin-top:-10px;">
+                Showing results for "<strong>{{ search }}</strong>" — matches are checked against
+                account, sender, subject, and result (SAFE/PHISHING) text.
+            </p>
+        {% endif %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Account</th>
+                        <th>Sender</th>
+                        <th>Subject</th>
+                        <th>Result</th>
+                        <th>Score</th>
+                        <th>Scanned At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for scan in recent_scans %}
+                    <tr>
+                        <td>{{ scan[1] }}</td>
+                        <td>{{ scan[2] }}</td>
+                        <td>{{ scan[3] }}</td>
+                        <td>
+                            {% if scan[4] == "PHISHING" %}
+                                <span class="badge badge-phishing">🚨 PHISHING</span>
+                            {% else %}
+                                <span class="badge badge-safe">✅ SAFE</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ scan[5] }}</td>
+                        <td>{{ scan[6] }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align:center">
+                            {% if search %}
+                                No scans matched "{{ search }}" (checked against sender, subject, result).
+                                <a href="{{ url_for('dashboard') }}">Clear search</a> to see everything.
+                            {% else %}
+                                No scan records yet.
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Whitelist / Blacklist management -->
+    <div class="grid">
+        <div class="panel">
+            <h2>✅ Whitelist</h2>
+            <form method="post" action="{{ url_for('lists_add') }}" style="display:flex; gap:8px; margin-bottom:15px;">
+                <input type="hidden" name="list_type" value="whitelist">
+                <input type="text" name="entry" placeholder="email or domain" required style="flex:1;">
+                <button type="submit" class="btn btn-green">Add</button>
+            </form>
+            <div class="table-wrapper">
+                <table><tbody>
+                {% for entry, added_at in whitelist %}
+                    <tr>
+                        <td>{{ entry }}</td><td>{{ added_at }}</td>
+                        <td>
+                            <form method="post" action="{{ url_for('lists_remove') }}">
+                                <input type="hidden" name="entry" value="{{ entry }}">
+                                <button type="submit" class="link-btn">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td style="text-align:center">No whitelisted entries.</td></tr>
+                {% endfor %}
+                </tbody></table>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>🚫 Blacklist</h2>
+            <form method="post" action="{{ url_for('lists_add') }}" style="display:flex; gap:8px; margin-bottom:15px;">
+                <input type="hidden" name="list_type" value="blacklist">
+                <input type="text" name="entry" placeholder="email or domain" required style="flex:1;">
+                <button type="submit" class="btn btn-red">Add</button>
+            </form>
+            <div class="table-wrapper">
+                <table><tbody>
+                {% for entry, added_at in blacklist %}
+                    <tr>
+                        <td>{{ entry }}</td><td>{{ added_at }}</td>
+                        <td>
+                            <form method="post" action="{{ url_for('lists_remove') }}">
+                                <input type="hidden" name="entry" value="{{ entry }}">
+                                <button type="submit" class="link-btn">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td style="text-align:center">No blacklisted entries.</td></tr>
+                {% endfor %}
+                </tbody></table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phishing alerts -->
+    <div class="table-panel">
+        <h2>🚨 Recent Phishing Alerts</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Account</th><th>Sender</th><th>Subject</th><th>Detected At</th></tr>
+                </thead>
+                <tbody>
+                {% for email in phishing_emails %}
+                    <tr>
+                        <td>{{ email[1] }}</td>
+                        <td>{{ email[2] }}</td>
+                        <td>{{ email[3] }}</td>
+                        <td>{{ email[4] }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="4" style="text-align:center">No phishing alerts.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    new Chart(document.getElementById("emailChart"), {
+        type: "doughnut",
+        data: {
+            labels: ["Safe", "Phishing"],
+            datasets: [{ data: [{{ stats.safe_emails }}, {{ stats.phishing_emails }}] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    const trendData = {{ trend | tojson }};
+    new Chart(document.getElementById("trendChart"), {
+        type: "line",
+        data: {
+            labels: trendData.map(r => r.date),
+            datasets: [
+                { label: "Safe", data: trendData.map(r => r.safe), borderColor: "#16a34a", backgroundColor: "rgba(22,163,74,0.1)", tension: 0.3 },
+                { label: "Phishing", data: trendData.map(r => r.phishing), borderColor: "#dc2626", backgroundColor: "rgba(220,38,38,0.1)", tension: 0.3 }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    // Manual refresh only - no auto-reload (see the Refresh button in the UI).
+</script>
+
+</body>
+</html>
