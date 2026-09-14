@@ -1,0 +1,22 @@
+services:
+  detector:
+    build: .
+    container_name: phishing-detector
+    command: ["python", "main.py"]
+    env_file:
+      - .env
+    volumes:
+      - ./phishing_alerts.db:/app/phishing_alerts.db
+    restart: unless-stopped
+
+  dashboard:
+    build: .
+    container_name: phishing-dashboard
+    command: ["python", "dashboard.py"]
+    env_file:
+      - .env
+    volumes:
+      - ./phishing_alerts.db:/app/phishing_alerts.db
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
